@@ -3,9 +3,9 @@ import { registerUser, loginUser, verifyEmail } from "../controllers/authControl
 
 const router = express.Router();
 
-// ✅ Authentication Routes
-router.post("/register", registerUser);
-router.post("/login", loginUser);
-router.get("/verify/:token", verifyEmail); // ✅ Verify Email
+// 🔹 Authentication Routes
+router.post("/register", registerUser);   // Route to register a new user
+router.post("/login", loginUser);         // Route for user login
+router.get("/verify/:token", verifyEmail); // Route to verify the email using the verification token
 
 export default router;
