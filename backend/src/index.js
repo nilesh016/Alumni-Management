@@ -18,6 +18,9 @@ import alumniRoutes from "./routes/alumniRoutes.js";
 import friendRoutes from "./routes/friendRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 
+
+
+
 // ✅ Connect to MongoDB
 connectDB();
 
@@ -97,6 +100,7 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/alumni", alumniRoutes);
 app.use("/api/friends", friendRoutes);
 app.use("/api/notifications", notificationRoutes);
+
 
 // ✅ Default Route
 app.get("/", (req, res) => res.send("API is running..."));
