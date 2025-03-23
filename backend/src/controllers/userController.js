@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import createTransporter from "../config/emailConfig.js";
 
-// Generate JWT Token
+// ✅ Generate JWT Token
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "30d" });
 };
@@ -12,10 +12,10 @@ const generateToken = (id) => {
 // 📌 Register User
 export const registerUser = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, batch, profession, location } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: "Please provide all required fields" });
+    if (!name || !email || !password || !batch || !profession || !location) {
+      return res.status(400).json({ message: "All fields are required" });
     }
 
     const normalizedEmail = email.toLowerCase();
@@ -25,27 +25,24 @@ export const registerUser = async (req, res) => {
       return res.status(400).json({ message: "User already exists" });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Generate email verification token
     const verificationToken = crypto.randomBytes(32).toString("hex");
     const hashedToken = crypto.createHash("sha256").update(verificationToken).digest("hex");
 
-    // Create new user
     const user = await User.create({
       name,
       email: normalizedEmail,
       password: hashedPassword,
+      batch,
+      profession,
+      location,
       isVerified: false,
       verificationToken: hashedToken,
-      verificationTokenExpires: Date.now() + 3600000, // 1 hour expiration
+      verificationTokenExpires: Date.now() + 3600000, // 1 hour expiry
     });
 
-    // Send verification email
     await sendVerificationEmail(normalizedEmail, verificationToken);
-
-    res.status(201).json({ message: "Registration successful. Check your email for verification." });
+    res.status(201).json({ message: "Registration successful. Verify your email." });
   } catch (error) {
     console.error("❌ Registration Error:", error);
     res.status(500).json({ message: "Server error", error });
@@ -54,21 +51,12 @@ export const registerUser = async (req, res) => {
 
 // 📌 Send Verification Email (Helper Function)
 const sendVerificationEmail = async (email, verificationToken) => {
-  const verificationLink = `${process.env.BASE_URL}/api/users/verify/${verificationToken}`;
-  
+  const verificationLink = `${process.env.BASE_URL}/api/users/email/verify/${verificationToken}`;
   const mailOptions = {
-    from: `"Alumni Management System" <${process.env.EMAIL_USER}>`,
+    from: `Alumni Management System <${process.env.EMAIL_USER}>`,
     to: email,
     subject: "Verify Your Email",
-    html: `
-      <h2>Welcome to Alumni Management System</h2>
-      <p>Click the link below to verify your email:</p>
-      <a href="${verificationLink}" target="_blank" rel="noopener noreferrer"
-        style="display:inline-block;padding:10px 20px;color:#fff;background:#007bff;text-decoration:none;border-radius:5px;">
-        Verify Email
-      </a>
-      <p>If you didn't request this, please ignore this email.</p>
-    `,
+    html: `<h2>Welcome</h2><p>Click to verify: <a href="${verificationLink}" target="_blank">Verify Email</a></p>`
   };
 
   const transporter = await createTransporter();
@@ -80,12 +68,9 @@ const sendVerificationEmail = async (email, verificationToken) => {
 export const verifyEmail = async (req, res) => {
   try {
     const hashedToken = crypto.createHash("sha256").update(req.params.token).digest("hex");
-
-    console.log("🔍 Verifying Token:", hashedToken);
-
     const user = await User.findOne({
       verificationToken: hashedToken,
-      verificationTokenExpires: { $gt: Date.now() }, // Token must not be expired
+      verificationTokenExpires: { $gt: Date.now() },
     });
 
     if (!user) {
@@ -97,38 +82,9 @@ export const verifyEmail = async (req, res) => {
     user.verificationTokenExpires = undefined;
     await user.save();
 
-    res.json({ message: "✅ Email verified successfully! You can now log in." });
+    res.json({ message: "✅ Email verified successfully!" });
   } catch (error) {
     console.error("❌ Email Verification Error:", error);
-    res.status(500).json({ message: "Server error", error });
-  }
-};
-
-// 📌 Resend Verification Email
-export const resendVerificationEmail = async (req, res) => {
-  try {
-    const { email } = req.body;
-    const user = await User.findOne({ email: email.toLowerCase() });
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-    if (user.isVerified) {
-      return res.status(400).json({ message: "Email is already verified." });
-    }
-
-    // Generate new verification token
-    const verificationToken = crypto.randomBytes(32).toString("hex");
-    user.verificationToken = crypto.createHash("sha256").update(verificationToken).digest("hex");
-    user.verificationTokenExpires = Date.now() + 3600000; // 1 hour expiration
-    await user.save();
-
-    // Send new verification email
-    await sendVerificationEmail(email, verificationToken);
-
-    res.json({ message: "Verification email sent successfully." });
-  } catch (error) {
-    console.error("❌ Resend Verification Error:", error);
     res.status(500).json({ message: "Server error", error });
   }
 };
@@ -137,13 +93,12 @@ export const resendVerificationEmail = async (req, res) => {
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
-    
+
     if (!email || !password) {
       return res.status(400).json({ message: "Please provide email and password" });
     }
 
-    const normalizedEmail = email.toLowerCase();
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = await User.findOne({ email: email.toLowerCase() });
 
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(400).json({ message: "Invalid email or password" });
@@ -153,12 +108,11 @@ export const loginUser = async (req, res) => {
       return res.status(403).json({ message: "Please verify your email first." });
     }
 
-    // Set JWT as HTTP-only cookie for better security
     res.cookie("jwt", generateToken(user.id), {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // HTTPS only in production
+      secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      maxAge: 30 * 24 * 60 * 60 * 1000,
     });
 
     res.json({ message: "Login successful!" });
@@ -168,22 +122,68 @@ export const loginUser = async (req, res) => {
   }
 };
 
-// 📌 Logout User
-export const logoutUser = async (req, res) => {
-  res.cookie("jwt", "", { httpOnly: true, expires: new Date(0) });
-  res.json({ message: "User logged out successfully." });
-};
-
 // 📌 Get User Profile
 export const getProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
-    if (user) {
-      res.json(user);
-    } else {
-      res.status(404).json({ message: "User not found" });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
+
+    res.status(200).json(user);
   } catch (error) {
+    console.error("❌ Profile Fetch Error:", error);
     res.status(500).json({ message: "Server error", error });
   }
+};
+
+// 📌 Search Alumni
+export const searchAlumni = async (req, res) => {
+  try {
+    const { batch, profession, location, name } = req.query;
+    const filters = {};
+
+    if (batch) filters.batch = batch;
+    if (profession) filters.profession = profession;
+    if (location) filters.location = location;
+    if (name) filters.name = { $regex: name, $options: "i" };
+
+    const users = await User.find(filters).select("-password");
+    res.json(users);
+  } catch (error) {
+    console.error("❌ Search Error:", error);
+    res.status(500).json({ message: "Server error", error });
+  }
+};
+
+// 📌 Update User Profile
+export const updateUserProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const { name, batch, profession, location } = req.body;
+
+    if (name) user.name = name;
+    if (batch) user.batch = batch;
+    if (profession) user.profession = profession;
+    if (location) user.location = location;
+
+    await user.save();
+    res.json({ message: "Profile updated successfully" });
+  } catch (error) {
+    console.error("❌ Update Profile Error:", error);
+    res.status(500).json({ message: "Server error", error });
+  }
+};
+
+// ✅ Export all controllers (No duplicate exports!)
+export {
+  registerUser,
+  verifyEmail,
+  loginUser,
+  getProfile,
+  searchAlumni,
+  updateUserProfile // ✅ Only exported once!
 };

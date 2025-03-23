@@ -26,22 +26,25 @@ const achievementSchema = new mongoose.Schema({
   date: { type: Date },
 });
 
-// 🔹 Friend Requests Schema (Enhanced)
+// 🔹 Friend Requests Schema
 const friendRequestSchema = new mongoose.Schema({
   sender: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-  status: { 
-    type: String, 
-    enum: ["pending", "accepted", "declined"], 
-    default: "pending" 
+  receiver: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  status: {
+    type: String,
+    enum: ["pending", "accepted", "declined"],
+    default: "pending",
   },
+  createdAt: { type: Date, default: Date.now },
 });
 
 const userSchema = new mongoose.Schema(
   {
-    // ✅ Basic Info
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
-    password: { type: String, required: true, minlength: 6 },
+    batch: { type: String, required: true, index: true },
+    profession: { type: String, index: true },
+    location: { type: String, index: true },
     
     // ✅ User Role & Verification
     isAdmin: { type: Boolean, default: false },
@@ -49,20 +52,13 @@ const userSchema = new mongoose.Schema(
     verificationToken: { type: String },
     verificationTokenExpires: { type: Date },
 
-    // ✅ Password Reset Fields
+    // ✅ Password & Authentication
+    password: { type: String, required: true, minlength: 6 },
     resetPasswordToken: { type: String },
     resetPasswordExpires: { type: Date },
 
-    // ✅ Additional Searchable Fields
-    batch: { type: String, default: "", index: true }, // Example: "2020-2024"
-    department: { type: String, default: "", index: true }, // Example: "Computer Science"
-    location: { type: String, default: "", index: true }, // Example: "Mumbai, India"
-
     // ✅ Profile Fields
-    avatar: { 
-      type: String, 
-      default: "https://via.placeholder.com/150" // Default avatar placeholder
-    },
+    avatar: { type: String, default: "https://via.placeholder.com/150" },
     bio: { type: String, default: "" },
     socialLinks: {
       linkedin: { type: String, default: "" },
@@ -71,13 +67,13 @@ const userSchema = new mongoose.Schema(
     },
 
     // ✅ Work & Education
-    education: [educationSchema], 
+    education: [educationSchema],
     workExperience: [workExperienceSchema],
     achievements: [achievementSchema],
 
     // ✅ Friend Connections & Requests
-    connections: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // Friends/Connections
-    friendRequests: [friendRequestSchema], // Improved structure for friend requests
+    connections: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    friendRequests: [friendRequestSchema],
 
     // ✅ Soft Delete Option
     isDeleted: { type: Boolean, default: false },
@@ -85,7 +81,10 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// 🔹 Virtual Full Name (Modify if needed)
+// ✅ Create compound index for efficient searching
+userSchema.index({ batch: 1, profession: 1, location: 1 });
+
+// 🔹 Virtual Full Name
 userSchema.virtual("fullName").get(function () {
   return this.name;
 });
