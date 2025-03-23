@@ -3,23 +3,25 @@ import crypto from "crypto";
 import createTransporter from "../config/emailConfig.js";
 import bcrypt from "bcryptjs";
 
-// ✅ Forgot Password (Send Reset Email)
+// 📌 Forgot Password (Send Reset Email)
 export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
     console.log("🔍 Forgot Password Request for:", email);
 
     const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) {
+      return res.status(200).json({ message: "If your email is registered, you will receive a reset link shortly." });
+    }
 
-    // Generate a reset token
+    // Generate secure reset token
     const resetToken = crypto.randomBytes(32).toString("hex");
     user.resetPasswordToken = resetToken;
-    user.resetPasswordExpires = Date.now() + 3600000; // Token expires in 1 hour
+    user.resetPasswordExpires = Date.now() + 3600000; // Token valid for 1 hour
     await user.save();
 
     // Reset link
-    const resetLink = `${process.env.BASE_URL}/api/password/reset-password/${resetToken}`;
+    const resetLink = `${process.env.BASE_URL}/reset-password/${resetToken}`;
 
     // Email options
     const mailOptions = {
@@ -29,7 +31,10 @@ export const forgotPassword = async (req, res) => {
       html: `
         <h2>Password Reset</h2>
         <p>Click the link below to reset your password:</p>
-        <a href="${resetLink}" style="display:inline-block;padding:10px 20px;color:#fff;background:#dc3545;text-decoration:none;border-radius:5px;">Reset Password</a>
+        <a href="${resetLink}" target="_blank" rel="noopener noreferrer" 
+          style="display:inline-block;padding:10px 20px;color:#fff;background:#dc3545;text-decoration:none;border-radius:5px;">
+          Reset Password
+        </a>
         <p>If you didn't request this, please ignore this email.</p>
       `,
     };
@@ -39,20 +44,19 @@ export const forgotPassword = async (req, res) => {
     await transporter.sendMail(mailOptions);
     console.log(`✅ Reset email sent to: ${email}`);
 
-    res.json({ message: "Reset password email sent! Check your inbox." });
+    res.json({ message: "If your email is registered, you will receive a reset link shortly." });
   } catch (error) {
     console.error("❌ Forgot Password Error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// ✅ Reset Password (Using Token)
+// 📌 Reset Password (Using Token)
 export const resetPassword = async (req, res) => {
   try {
     const { token } = req.params;
     const { newPassword } = req.body;
 
-    // Ensure password meets minimum length
     if (newPassword.length < 6) {
       return res.status(400).json({ message: "Password must be at least 6 characters long" });
     }

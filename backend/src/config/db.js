@@ -10,7 +10,11 @@ if (!MONGO_URI) {
   process.exit(1);
 }
 
-const connectDB = async () => {
+// 📌 Retry Configuration
+const MAX_RETRIES = 5;
+const RETRY_DELAY = 5000; // 5 seconds
+
+const connectDB = async (retries = MAX_RETRIES) => {
   try {
     const conn = await mongoose.connect(MONGO_URI, {
       useNewUrlParser: true,
@@ -20,8 +24,26 @@ const connectDB = async () => {
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
     console.error(`❌ MongoDB Connection Error: ${error.message}`);
-    process.exit(1);
+
+    if (retries > 0) {
+      console.log(`🔄 Retrying connection in ${RETRY_DELAY / 1000} seconds... (${retries} attempts left)`);
+      setTimeout(() => connectDB(retries - 1), RETRY_DELAY);
+    } else {
+      console.error("❌ Max retries reached. Exiting...");
+      process.exit(1);
+    }
   }
 };
+
+// 📌 Handle MongoDB Errors
+mongoose.connection.on("error", (err) => {
+  console.error(`❌ MongoDB Connection Error: ${err.message}`);
+});
+
+// 📌 Handle Disconnection & Auto-Reconnect
+mongoose.connection.on("disconnected", () => {
+  console.warn("⚠️ MongoDB Disconnected! Attempting to reconnect...");
+  connectDB();
+});
 
 export default connectDB;
