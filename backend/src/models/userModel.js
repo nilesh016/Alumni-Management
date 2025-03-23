@@ -45,7 +45,7 @@ const userSchema = new mongoose.Schema(
     batch: { type: String, required: true, index: true },
     profession: { type: String, index: true },
     location: { type: String, index: true },
-    
+
     // ✅ User Role & Verification
     isAdmin: { type: Boolean, default: false },
     isVerified: { type: Boolean, default: false },
@@ -77,6 +77,9 @@ const userSchema = new mongoose.Schema(
 
     // ✅ Soft Delete Option
     isDeleted: { type: Boolean, default: false },
+
+    // ✅ Notification Count (New Feature)
+    unreadNotificationCount: { type: Number, default: 0, index: true },
   },
   { timestamps: true }
 );
@@ -100,6 +103,19 @@ userSchema.pre("save", async function (next) {
 // 🔹 Compare Entered Password
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
+};
+
+// 🔹 Update Unread Notification Count (Helper Methods)
+userSchema.methods.incrementUnreadNotifications = async function () {
+  this.unreadNotificationCount += 1;
+  await this.save();
+};
+
+userSchema.methods.decrementUnreadNotifications = async function () {
+  if (this.unreadNotificationCount > 0) {
+    this.unreadNotificationCount -= 1;
+    await this.save();
+  }
 };
 
 const User = mongoose.model("User", userSchema);

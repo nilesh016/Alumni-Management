@@ -178,12 +178,12 @@ export const updateUserProfile = async (req, res) => {
   }
 };
 
-// ✅ Export all controllers (No duplicate exports!)
-export {
-  registerUser,
-  verifyEmail,
-  loginUser,
-  getProfile,
-  searchAlumni,
-  updateUserProfile // ✅ Only exported once!
-};
+// ✅ Export all controllers
+// export {
+//   registerUser,
+//   verifyEmail,
+//   loginUser,
+//   getProfile,
+//   searchAlumni,
+ 
+// };

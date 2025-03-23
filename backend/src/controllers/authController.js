@@ -34,10 +34,16 @@ export const registerUser = async (req, res) => {
 
     const transporter = await createTransporter();
 
-    await Promise.all([
-      User.create({ name, email, password: hashedPassword, verificationToken, isVerified: false }),
-      transporter.sendMail(mailOptions),
-    ]);
+    const newUser = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+      verificationToken,
+      isVerified: false,
+      unreadNotificationCount: 1, // ✅ Initialize with 1 unread notification
+    });
+
+    await transporter.sendMail(mailOptions);
 
     console.log(`✅ Verification email sent to: ${email}`);
     res.status(201).json({ message: "User registered! Check your email for verification." });
@@ -64,6 +70,7 @@ export const verifyEmail = async (req, res) => {
 
     user.isVerified = true;
     user.verificationToken = undefined;
+    user.unreadNotificationCount = 0; // ✅ Reset unread count after verification
     await user.save();
 
     res.json({ message: "✅ Email verified successfully! You can now log in." });
@@ -92,6 +99,7 @@ export const loginUser = async (req, res) => {
       name: user.name,
       email: user.email,
       isVerified: user.isVerified,
+      unreadNotificationCount: user.unreadNotificationCount, // ✅ Send unread count on login
       token: generateToken(user.id),
     });
   } catch (error) {

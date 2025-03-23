@@ -17,7 +17,7 @@ const emitUnreadCount = async (userId) => {
   }
 };
 
-// 📌 Send Notification (with real-time support)
+// 📌 Send Notification (with real-time & offline support)
 export const sendNotification = async (recipientId, senderId, type, message) => {
   try {
     // ✅ Save the notification in the database
@@ -28,18 +28,45 @@ export const sendNotification = async (recipientId, senderId, type, message) => 
       message,
     });
 
-    // ✅ Emit real-time notification & unread count update
+    // ✅ Emit real-time notification if user is online
     const recipientSocketId = global._io?.connectedUsers?.get(recipientId);
     if (recipientSocketId) {
       global._io.to(recipientSocketId).emit("receiveNotification", notification);
     } else {
       console.log(`⚠️ User ${recipientId} is offline. Notification saved.`);
+      await Notification.findByIdAndUpdate(notification._id, { isOffline: true });
     }
 
     // ✅ Update unread count in real-time
     await emitUnreadCount(recipientId);
   } catch (error) {
     console.error("❌ Send Notification Error:", error);
+  }
+};
+
+// 📌 Deliver Offline Notifications When User Comes Online
+export const deliverOfflineNotifications = async (userId) => {
+  try {
+    const offlineNotifications = await Notification.find({
+      recipient: userId,
+      isOffline: true,
+    });
+
+    const recipientSocketId = global._io?.connectedUsers?.get(userId);
+    if (recipientSocketId && offlineNotifications.length > 0) {
+      offlineNotifications.forEach((notification) => {
+        global._io.to(recipientSocketId).emit("receiveNotification", notification);
+      });
+
+      await Notification.updateMany(
+        { recipient: userId, isOffline: true },
+        { isOffline: false }
+      );
+
+      console.log(`🔵 Delivered ${offlineNotifications.length} offline notifications to User ${userId}`);
+    }
+  } catch (error) {
+    console.error("❌ Deliver Offline Notifications Error:", error);
   }
 };
 
